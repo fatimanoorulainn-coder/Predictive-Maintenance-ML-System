@@ -1,0 +1,11 @@
+{
+  "model_name": "xgboost",
+  "model_file": "xgboost_model.joblib",
+  "scaler_file": "scaler.joblib",
+  "threshold": 0.8217284083366394,
+  "preprocessing": {
+    "scaler_type": "StandardScaler",
+    "target_recall": 0.95
+  },
+  "created_at": "2026-05-12T16:03:49.568859"
+}
