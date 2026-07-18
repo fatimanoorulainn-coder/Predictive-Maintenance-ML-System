@@ -3,7 +3,7 @@
 ## Overview
 A machine learning system for predicting machinery failures from sensor data using time-series feature engineering and gradient-boosted trees. Optimized for **recall** as the primary objective, because missing a failure is far more costly than a false alarm.
 
-> **Note on metrics below:** numbers in this README are illustrative placeholders reflecting realistic performance for a ~530-sample sensor dataset. Replace every number in this file with your actual `outputs/evaluation_results.json` / `outputs/model_metrics.json` output once you run `train.py` and `evaluate.py` on your real data — do not present placeholder numbers as final results.
+> **Note on metrics below:** numbers in this README are illustrative placeholders reflecting realistic performance for a ~530-sample sensor dataset. Replace every number in this file with your actual evaluation output (e.g. `models/deployment_config.json`, `reports/drift_report.csv`, or whatever your `evaluate.py` writes) once you run `train.py` and `evaluate.py` on your real data — do not present placeholder numbers as final results.
 
 ## Key Features
 - **High Recall Focus:** Optimized to catch failures while keeping precision usable
@@ -17,42 +17,70 @@ A machine learning system for predicting machinery failures from sensor data usi
 ## Project Structure
 ```
 project/
-├── data/
-│   └── sensor_data.csv                 # Raw sensor data
+├── backend/
+│   ├── app.py                          # API entrypoint
+│   └── failure_success_log.txt         # Prediction outcome log
+│
+├── deploy/
+│   ├── backend/
+│   │   └── app.py                      # Deployment-packaged API
+│   ├── models/                         # Model artifacts bundled for deployment
+│   │   ├── best_model.joblib
+│   │   ├── xgboost_model.joblib
+│   │   ├── scaler.joblib
+│   │   ├── smote.joblib
+│   │   ├── feature_names.pkl
+│   │   ├── optimal_threshold.pkl
+│   │   ├── optimal_threshold.json
+│   │   └── deployment_config.json
+│   ├── src/                            # Deployment-side pipeline code
+│   ├── .dockerignore
+│   ├── Dockerfile
+│   └── requirements.txt
+│
+├── models/                             # Source-of-truth trained artifacts
+│   ├── best_model.joblib
+│   ├── xgboost_model.joblib
+│   ├── scaler.joblib
+│   ├── smote.joblib
+│   ├── feature_names.pkl
+│   ├── optimal_threshold.pkl
+│   ├── optimal_threshold.json
+│   └── deployment_config.json
+│
+├── plots/                              # Full EDA + evaluation visualization suite
+│   ├── 0_scaling_comparison.png
+│   ├── 1_class_distribution.png
+│   ├── 2_correlation_heatmap.png
+│   ├── 3_sensor_signals.png
+│   ├── 4_missing_values.png
+│   ├── 5_outlier_detection.png
+│   ├── 6_rolling_features.png
+│   ├── 7_lag_features.png
+│   ├── 8_roc_features.png
+│   ├── 9_fft_features.png
+│   ├── 10_feature_importance.png
+│   └── 11_drift_report.png
 │
 ├── processed/
-│   ├── processed_train.csv             # Preprocessed training data
-│   └── processed_test.csv              # Preprocessed test data
+│   ├── processed_train.csv
+│   └── processed_test.csv
 │
-├── src/
-│   ├── __init__.py
-│   ├── config.py                       # Configuration parameters
-│   ├── utils.py                        # Utility functions
-│   ├── train.py                        # Training pipeline
-│   └── evaluate.py                     # Evaluation & visualization
+├── reports/
+│   └── drift_report.csv
 │
-├── models/
-│   ├── best_model.joblib               # Trained XGBoost model
-│   ├── optimal_threshold.pkl           # Optimal decision threshold
-│   ├── feature_names.pkl               # Feature names
-│   ├── scaler.joblib                   # Fitted scaler
-│   └── smote.joblib                    # SMOTE transformer
-│
-├── outputs/
-│   ├── plots/
-│   │   ├── confusion_matrix.png
-│   │   ├── roc_curve.png
-│   │   ├── precision_recall_curve.png
-│   │   └── feature_importance.png
-│   ├── logs/
-│   │   └── training.log
-│   ├── model_metrics.json
-│   └── evaluation_results.json
-│
+├── src/                                # Training pipeline (config, utils, train, evaluate)
+├── analysis.py                         # Exploratory / offline analysis script
+├── DELIVERY_SUMMARY.md                 # Handoff summary
+├── IMPLEMENTATION_GUIDE.md             # Setup & usage walkthrough
+├── Dockerfile
+├── .dockerignore
+├── .gitignore
 ├── requirements.txt
-├── README.md
-└── LICENSE
+└── README.md
 ```
+
+> **Note:** `models/` and `deploy/models/` currently hold duplicate copies of the same artifacts. Worth resolving before this repo gets scrutinized — either symlink `deploy/models` to the top-level `models/`, or document explicitly *why* they're separate (e.g., `deploy/models` is a frozen, versioned snapshot for the container build while `models/` is the live output of `train.py`). Two unexplained copies of the same files reads as clutter, not intent.
 
 ## Installation
 
@@ -87,7 +115,7 @@ This will:
 ```bash
 python src/evaluate.py
 ```
-This will load the trained model, evaluate on the held-out test set, and save plots to `outputs/plots/`.
+This will load the trained model, evaluate on the held-out test set, save the full EDA/evaluation visualization suite to `plots/`, and write drift diagnostics to `reports/drift_report.csv`.
 
 ## Engineering Design Decisions
 
@@ -148,6 +176,9 @@ GRID_SEARCH_CONFIG = {
 ```
 
 ## Model Usage in Production (FastAPI Example)
+
+Served from `backend/app.py`, with the deployment-packaged copy (app + models + Dockerfile) living under `deploy/`. Core logic:
+
 ```python
 import joblib
 import pickle
@@ -210,14 +241,23 @@ curl -X POST "http://localhost:8000/predict" \
 ```
 
 ### Docker Deployment
+The `deploy/` directory is a self-contained deployment bundle — its own `backend/`, `models/`, `src/`, `Dockerfile`, `.dockerignore`, and `requirements.txt` — so the container can be built without depending on the rest of the repo:
+
+```bash
+cd deploy/
+docker build -t predictive-maintenance-api .
+docker run -p 8000:8000 predictive-maintenance-api
+```
+
 ```dockerfile
+# deploy/Dockerfile
 FROM python:3.9-slim
 WORKDIR /app
 COPY models/ models/
 COPY src/ src/
-COPY main.py .
+COPY backend/ backend/
 RUN pip install --no-cache-dir -r requirements.txt
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 ## Key Metrics Explained
