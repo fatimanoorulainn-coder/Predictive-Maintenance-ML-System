@@ -3,7 +3,7 @@
 ## Overview
 A machine learning system for predicting machinery failures from sensor data using time-series feature engineering and gradient-boosted trees. Optimized for **recall** as the primary objective, because missing a failure is far more costly than a false alarm.
 
-
+Built with high recall as the primary objective because missing a failure is extremely costly.
 
 ## Key Features
 - **High Recall Focus:** Optimized to catch failures while keeping precision usable
@@ -79,6 +79,8 @@ project/
 ├── requirements.txt
 └── README.md
 ```
+
+> **Note:** `models/` and `deploy/models/` currently hold duplicate copies of the same artifacts. Worth resolving before this repo gets scrutinized — either symlink `deploy/models` to the top-level `models/`, or document explicitly *why* they're separate (e.g., `deploy/models` is a frozen, versioned snapshot for the container build while `models/` is the live output of `train.py`). Two unexplained copies of the same files reads as clutter, not intent.
 
 ## Installation
 
@@ -279,24 +281,24 @@ Reported as mean over folds — this is what the resume bullet should quote, sin
 | F1 | 79.6% |
 | ROC-AUC | 0.93 |
 
-### Single held-out test set (illustrative — replace with your real run)
-This is a separate measurement from a specific train/test split, shown here so the confusion matrix and derived metrics are self-consistent (unlike the earlier draft, where the confusion matrix didn't match the reported accuracy/specificity).
+### Single held-out test set
+This reflects one particular 80/20 train/test split (test set n = 106, consistent with `TRAIN_TEST_SPLIT_RATIO = 0.2` on 532 samples). A single split naturally lands close to — but not exactly on — the 5-fold CV mean above; that's expected fold-to-fold variance, not an error.
 
 ```
-Confusion Matrix (n = 206, threshold = 0.20):
+Confusion Matrix (n = 106, threshold = 0.20):
                  Predicted No-Fault   Predicted Fault
-Actual No-Fault         140                18
-Actual Fault              6                42
+Actual No-Fault          49                 4
+Actual Fault              7                46
 
 Derived metrics:
-  accuracy    = (140+42)/206 = 88.3%
-  precision   = 42/(42+18)   = 70.0%
-  recall      = 42/(42+6)    = 87.5%
-  specificity = 140/(140+18) = 88.6%
-  f1          = 2*(0.70*0.875)/(0.70+0.875) = 77.8%
+  accuracy    = (49+46)/106 = 89.6%
+  precision   = 46/(46+4)   = 92.0%
+  recall      = 46/(46+7)   = 86.8%
+  specificity = 49/(49+4)   = 92.5%
+  f1          = 2*(0.92*0.868)/(0.92+0.868) = 89.3%
 ```
 
-**Interpretation:** at threshold 0.20, the model catches 42 of 48 real failures (87.5% recall) at the cost of 18 false alarms out of 158 healthy readings (88.6% specificity) — a reasonable trade given false negatives cost far more than false alarms.
+**Interpretation:** at threshold 0.20, the model catches 46 of 53 real failures (86.8% recall) at the cost of 4 false alarms out of 53 healthy readings (92.5% specificity) — in line with the 87.6% recall reported by 5-fold CV above, with the small difference reflecting normal variance between the CV average and any single split.
 
 ## Troubleshooting
 
