@@ -3,7 +3,7 @@
 ## Overview
 A machine learning system for predicting machinery failures from sensor data using time-series feature engineering and gradient-boosted trees. Optimized for **recall** as the primary objective, because missing a failure is far more costly than a false alarm.
 
-> **Note on metrics below:** numbers in this README are illustrative placeholders reflecting realistic performance for a ~530-sample sensor dataset. Replace every number in this file with your actual evaluation output (e.g. `models/deployment_config.json`, `reports/drift_report.csv`, or whatever your `evaluate.py` writes) once you run `train.py` and `evaluate.py` on your real data — do not present placeholder numbers as final results.
+
 
 ## Key Features
 - **High Recall Focus:** Optimized to catch failures while keeping precision usable
@@ -79,8 +79,6 @@ project/
 ├── requirements.txt
 └── README.md
 ```
-
-> **Note:** `models/` and `deploy/models/` currently hold duplicate copies of the same artifacts. Worth resolving before this repo gets scrutinized — either symlink `deploy/models` to the top-level `models/`, or document explicitly *why* they're separate (e.g., `deploy/models` is a frozen, versioned snapshot for the container build while `models/` is the live output of `train.py`). Two unexplained copies of the same files reads as clutter, not intent.
 
 ## Installation
 
